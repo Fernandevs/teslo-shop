@@ -1,53 +1,56 @@
-import { Response } from 'express';
-import { diskStorage } from 'multer';
-
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Res,
-  UploadedFile,
-  UseInterceptors
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, UploadedFile, UseInterceptors, BadRequestException, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { Response } from 'express';
+import { diskStorage } from 'multer';
 import { FilesService } from './files.service';
-import { fileFilter, filename } from './helpers';
 
+import { fileFilter, fileNamer } from './helpers';
+
+@ApiTags('Files - Get and Upload')
 @Controller('files')
 export class FilesController {
   constructor(
     private readonly filesService: FilesService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+  ) {}
+
+  @Get('product/:imageName')
+  findProductImage(
+    @Res() res: Response,
+    @Param('imageName') imageName: string
   ) {
+
+    const path = this.filesService.getStaticProductImage( imageName );
+
+    res.sendFile( path );
   }
 
-  @Get('product/:image')
-  findOne(
-    @Res() response: Response,
-    @Param('image') image: string
-  ) {
-    const path = this.filesService.getStaticProductImage(image);
 
-    response.sendFile(path);
-  }
 
   @Post('product')
-  @UseInterceptors(FileInterceptor('file', {
+  @UseInterceptors( FileInterceptor('file', {
     fileFilter: fileFilter,
+    // limits: { fileSize: 1000 }
     storage: diskStorage({
       destination: './static/products',
-      filename: filename
+      filename: fileNamer
     })
-  }))
-  uploadProductImage(@UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('Make sure that the file is an image');
+  }) )
+  uploadProductImage( 
+    @UploadedFile() file: Express.Multer.File,
+  ){
 
+    if ( !file ) {
+      throw new BadRequestException('Make sure that the file is an image');
+    }
+
+    // const secureUrl = `${ file.filename }`;
     const secureUrl = `${ this.configService.get('HOST_API') }/files/product/${ file.filename }`;
 
     return { secureUrl };
   }
+
 }
